@@ -19,6 +19,7 @@
     "xtend": "^4.0.0"
   },
   "devDependencies": {
+    "js-yaml": "^3.2.6",
     "levelup": "~0.18.2",
     "longjohn": "^0.2.4",
     "mocha": "~1.18.2",
