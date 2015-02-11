@@ -28,15 +28,12 @@ function FsDOWN(location, options) {
     }),
   });
 
-  this.fileEncoding = 
-    typeof options.fileEncoding === 'string' ?
-      encodings[options.fileEncoding] :
-      options.fileEncoding || this.encodings.json;
+  this.dataEncoding = 
+    typeof options.dataEncoding === 'string' ?
+      encodings[options.dataEncoding] :
+      options.dataEncoding || this.encodings.json;
   ;
-  this.bufferEncoding = 
-    typeof options.bufferEncoding === 'string' ?
-      encodings[options.bufferEncoding] :
-      options.bufferEncoding || this.encodings.utf8;
+  this.fileEncoding = options.fileEncoding || "utf-8";
 
   this._isLoadingFromFile = false;
   this._isWriting = false;
@@ -52,9 +49,9 @@ FsDOWN.prototype._jsonToBatchOps = function(data) {
       key = key.slice(1);
     } else {
       try {
-        key = new Buffer(this.fileEncoding.decode(key));
+        key = new Buffer(this.dataEncoding.decode(key));
       } catch (e) {
-        throw new Error('Error parsing key ' + this.fileEncoding.encode(key) +
+        throw new Error('Error parsing key ' + this.dataEncoding.encode(key) +
                         ' as a buffer');
       }
     }
@@ -62,7 +59,7 @@ FsDOWN.prototype._jsonToBatchOps = function(data) {
       try {
         value = new Buffer(value);
       } catch (e) {
-        throw new Error('Error parsing value ' + this.fileEncoding.encode(value) +
+        throw new Error('Error parsing value ' + this.dataEncoding.encode(value) +
                         ' as a buffer');
       }
     }
@@ -72,13 +69,13 @@ FsDOWN.prototype._jsonToBatchOps = function(data) {
 
 FsDOWN.prototype._open = function(options, cb) {
 
-  fs.readFile(this.location, this.bufferEncoding.type, function(err, data) {
+  fs.readFile(this.location, this.fileEncoding, function(err, data) {
     if (err) {
       if (err.code == 'ENOENT') return cb(null, this);
       return cb(err);
     }
     try {
-      data = this.fileEncoding.decode(data);
+      data = this.dataEncoding.decode(data);
     } catch (e) {
       return cb(new Error('Error parsing JSON in ' + this.location +
                           ': ' + e.message));
@@ -101,8 +98,8 @@ FsDOWN.prototype._writeToDisk = function(cb) {
   if (this._isWriting)
     return this._queuedWrites.push(cb);
   this._isWriting = true;
-  fs.writeFile(this.location, this.fileEncoding.encode(this._store), {
-    encoding: this.bufferEncoding.type,
+  fs.writeFile(this.location, this.dataEncoding.encode(this._store), {
+    encoding: this.fileEncoding,
   }, function(err) {
     var queuedWrites = this._queuedWrites.splice(0);
     this._isWriting = false;
