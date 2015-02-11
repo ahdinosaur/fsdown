@@ -1,32 +1,60 @@
 var util = require('util');
 var fs = require('fs');
 var MemDOWN = require('memdown');
+var encodings = require('levelup/lib/encodings');
+var extend = require('xtend');
 
-var niceStringify = require('./nice-stringify');
+if (process.env.NODE_ENV !== 'production'){
+//  require('longjohn');
+}
+
+//var niceStringify = require('./nice-stringify');
+var niceStringify = require('json-stringify-safe');
 
 function noop() {}
 
-function JsonDOWN(location) {
-  if (!(this instanceof JsonDOWN))
-    return new JsonDOWN(location);
+function FsDOWN(location, options) {
+  if (!(this instanceof FsDOWN))
+    return new FsDOWN(location, options);
   MemDOWN.call(this, location);
+
+  options = options || {};
+
+  // use encodings from levelup
+  this.encodings = extend(encodings, {
+    // use nice-stringify as encoder instead of JSON.stringify
+    json: extend(encodings.json, {
+      encode: niceStringify,
+    }),
+  });
+
+  this.fileEncoding = 
+    typeof options.fileEncoding === 'string' ?
+      encodings[options.fileEncoding] :
+      options.fileEncoding || this.encodings.json;
+  ;
+  this.bufferEncoding = 
+    typeof options.bufferEncoding === 'string' ?
+      encodings[options.bufferEncoding] :
+      options.bufferEncoding || this.encodings.utf8;
+
   this._isLoadingFromFile = false;
   this._isWriting = false;
   this._queuedWrites = [];
 }
 
-util.inherits(JsonDOWN, MemDOWN);
+util.inherits(FsDOWN, MemDOWN);
 
-JsonDOWN.prototype._jsonToBatchOps = function(data) {
+FsDOWN.prototype._jsonToBatchOps = function(data) {
   return Object.keys(data).map(function(key) {
     var value = data[key];
     if (/^\$/.test(key)) {
       key = key.slice(1);
     } else {
       try {
-        key = new Buffer(JSON.parse(key));
+        key = new Buffer(this.fileEncoding.decode(key));
       } catch (e) {
-        throw new Error('Error parsing key ' + JSON.stringify(key) +
+        throw new Error('Error parsing key ' + this.fileEncoding.encode(key) +
                         ' as a buffer');
       }
     }
@@ -34,22 +62,23 @@ JsonDOWN.prototype._jsonToBatchOps = function(data) {
       try {
         value = new Buffer(value);
       } catch (e) {
-        throw new Error('Error parsing value ' + JSON.stringify(value) +
+        throw new Error('Error parsing value ' + this.fileEncoding.encode(value) +
                         ' as a buffer');
       }
     }
     return {type: 'put', key: key, value: value};
-  });
+  }, this);
 };
 
-JsonDOWN.prototype._open = function(options, cb) {
-  fs.readFile(this.location, 'utf-8', function(err, data) {
+FsDOWN.prototype._open = function(options, cb) {
+
+  fs.readFile(this.location, this.bufferEncoding.type, function(err, data) {
     if (err) {
       if (err.code == 'ENOENT') return cb(null, this);
       return cb(err);
     }
     try {
-      data = JSON.parse(data);
+      data = this.fileEncoding.decode(data);
     } catch (e) {
       return cb(new Error('Error parsing JSON in ' + this.location +
                           ': ' + e.message));
@@ -68,12 +97,12 @@ JsonDOWN.prototype._open = function(options, cb) {
   }.bind(this));
 };
 
-JsonDOWN.prototype._writeToDisk = function(cb) {
+FsDOWN.prototype._writeToDisk = function(cb) {
   if (this._isWriting)
     return this._queuedWrites.push(cb);
   this._isWriting = true;
-  fs.writeFile(this.location, niceStringify(this._store), {
-    encoding: 'utf-8'
+  fs.writeFile(this.location, this.fileEncoding.encode(this._store), {
+    encoding: this.bufferEncoding.type,
   }, function(err) {
     var queuedWrites = this._queuedWrites.splice(0);
     this._isWriting = false;
@@ -85,14 +114,14 @@ JsonDOWN.prototype._writeToDisk = function(cb) {
   }.bind(this));
 };
 
-JsonDOWN.prototype._put = function(key, value, options, cb) {
+FsDOWN.prototype._put = function(key, value, options, cb) {
   MemDOWN.prototype._put.call(this, key, value, options, noop);
   if (!this._isLoadingFromFile) this._writeToDisk(cb);
 };
 
-JsonDOWN.prototype._del = function(key, options, cb) {
+FsDOWN.prototype._del = function(key, options, cb) {
   MemDOWN.prototype._del.call(this, key, options, noop);
   this._writeToDisk(cb);
 };
 
-module.exports = JsonDOWN;
+module.exports = FsDOWN;

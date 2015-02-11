@@ -13,13 +13,17 @@
     "test": "test"
   },
   "dependencies": {
-    "memdown": "0.7.0"
+    "json-stringify-safe": "^5.0.0",
+    "levelup": "^0.19.0",
+    "memdown": "0.7.0",
+    "xtend": "^4.0.0"
   },
   "devDependencies": {
-    "mocha": "~1.18.2",
     "levelup": "~0.18.2",
-    "sinon": "1.9.0",
-    "should": "~3.2.0-beta1"
+    "longjohn": "^0.2.4",
+    "mocha": "~1.18.2",
+    "should": "~3.2.0-beta1",
+    "sinon": "1.9.0"
   },
   "scripts": {
     "test": "mocha -R spec"
