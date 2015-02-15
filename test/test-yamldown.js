@@ -4,7 +4,7 @@ var levelup = require('levelup');
 var yaml = require('js-yaml');
 var sinon = require('sinon');
 
-var YamlDOWN = require('../jsondown')({
+var YamlDOWN = require('../')({
   encode: yaml.safeDump,
   decode: yaml.safeLoad,
   buffer: false,
