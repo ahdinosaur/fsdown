@@ -205,6 +205,7 @@ function fsDown(encoding) {
 
     this._setWriting(path, true);
 
+    key = this._encodeKey(key);
     this._get(key, {}, function (err, value) {
       if (err) { return cb(err); }
 
@@ -229,12 +230,10 @@ function fsDown(encoding) {
   };
 
   FsDOWN.prototype._get = function(key, options, cb) {
-    MemDOWN.prototype._get.call(this, key, options, function (err, value) {
+    MemDOWN.prototype._get.call(this, this._encodeKey(key), options, function (err, value) {
       if (err) { return cb(err); }
-      // decode value
-      value = encoding.decode(value);
-      cb(null, value);
-    });
+      cb(null, this._decodeValue(value));
+    }.bind(this));
   };
 
   FsDOWN.prototype._put = function(key, value, options, cb) {
@@ -242,11 +241,12 @@ function fsDown(encoding) {
     // encode value
     var put = this._dataToPut(key, value);
     MemDOWN.prototype._put.call(this, put.key, put.value, options, noop);
-    if (this._loaded) this._write(key, cb);
+    if (this._loaded) this._write(put.key, cb);
   };
 
   FsDOWN.prototype._del = function(key, options, cb) {
     // TODO check that level keys are can be filenames
+    key = this._encodeKey(key);
     MemDOWN.prototype._del.call(this, key, options, noop);
     this._write(key, cb);
   };

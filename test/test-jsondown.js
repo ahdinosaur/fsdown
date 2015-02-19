@@ -61,9 +61,7 @@ describe('JsonDOWN', function() {
   it('should get existing keys', function(done) {
     putPath(['hey'], '{ "you": "there" }');
     var db = initDb();
-    console.log("get hey");
     db.get('hey', function(err, value) {
-      console.log("got hey", err, value);
       if (err) return done(err);
       expect(value).to.deep.eql({ you: 'there' });
       done();
@@ -75,16 +73,6 @@ describe('JsonDOWN', function() {
     var db = initDb();
     db.get('nonexistent', function(err, value) {
       expect(err.notFound).to.be.true;
-      done();
-    });
-  });
-
-  it('should support binary values', function(done) {
-    putPath(['hello'], [1,2,3]);
-    var db = initDb();
-    db.get('hello', function(err, value) {
-      if (err) return done(err);
-      expect(value).to.eql(new Buffer([1,2,3]));
       done();
     });
   });
@@ -103,7 +91,7 @@ describe('JsonDOWN', function() {
     var db = initDb();
     db.put('foo', '{ "bar": "baz" }', function(err) {
       if (err) return done(err);
-      expect(getPath(["foo"])).to.deep.eql({bar: 'baz'});
+      expect(getPath(["foo"])).to.eql('{ "bar": "baz" }');
       done();
     });
   });
