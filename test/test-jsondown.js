@@ -37,72 +37,79 @@ function clearLocation () {
   rimraf.sync(LOCATION);
 }
 
+function initDb () {
+  return levelup(LOCATION, {
+    db: JsonDOWN,
+    valueEncoding: "json",
+  });
+}
+
 describe('JsonDOWN', function() {
   beforeEach(clearLocation);
   afterEach(clearLocation);
 
   it('should raise error on corrupted data', function(done) {
     putPath(["key"], 'i am not valid json');
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     db.open();
     db.on('error', function(err) {
-      expect(err.message).to.match(/^Error decoding file/);
+      expect(err.message).to.match(/^Error decoding value/);
       done();      
     });
   });
 
   it('should get existing keys', function(done) {
     putPath(['hey'], '{ "you": "there" }');
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     console.log("get hey");
     db.get('hey', function(err, value) {
       console.log("got hey", err, value);
       if (err) return done(err);
-      value.should.deep.eql({ you: 'there' });
+      expect(value).to.deep.eql({ you: 'there' });
       done();
     });
   });
 
   it('should raise error on nonexistent keys', function(done) {
     putPath(['hey'], '{ "you": "there" }');
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     db.get('nonexistent', function(err, value) {
-      err.notFound.should.be.true;
+      expect(err.notFound).to.be.true;
       done();
     });
   });
 
   it('should support binary values', function(done) {
     putPath(['hello'], [1,2,3]);
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     db.get('hello', function(err, value) {
       if (err) return done(err);
-      value.should.eql(new Buffer([1,2,3]));
+      expect(value).to.eql(new Buffer([1,2,3]));
       done();
     });
   });
 
   it('should delete', function(done) {
     putPath(['whats'], '{ "up": "down" }');
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     db.del('whats', function(err) {
       if (err) return done(err);
-      getPath(['whats']).should.eql({});
+      expect(getPath(['whats'])).to.deep.eql({});
       done();
     });
   });
 
   it('should put', function(done) {
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     db.put('foo', '{ "bar": "baz" }', function(err) {
       if (err) return done(err);
-      getPath(["foo"]).should.deep.eql({bar: 'baz'});
+      expect(getPath(["foo"])).to.deep.eql({bar: 'baz'});
       done();
     });
   });
 
   it('should intelligently queue writes', function(done) {
-    var db = levelup(LOCATION, {db: JsonDOWN});
+    var db = initDb();
     sinon.spy(fs, 'writeFile');
 
     db.put('foo', '{ "bar": "baz"}');
@@ -110,14 +117,14 @@ describe('JsonDOWN', function() {
     db.put('silly', '{ "monkey": "human"}', function(err) {
       if (err) return done(err);
 
-      getPath(['foo']).should.deep.eql({ bar: 'baz' });
-      getPath(['lol']).should.deep.eql({ cats: 'dogs' });
-      getPath(['silly']).should.deep.eql({ monkey: 'human' });
+      expect(getPath(['foo'])).to.deep.eql({ bar: 'baz' });
+      expect(getPath(['lol'])).to.deep.eql({ cats: 'dogs' });
+      expect(getPath(['silly'])).to.deep.eql({ monkey: 'human' });
 
-      fs.writeFile.callCount.should.eql(3);
+      expect(fs.writeFile.callCount).to.eql(3);
       db.del('lol', function(err) {
-        getPath(['lol']).should.throw;
-        fs.writeFile.callCount.should.eql(3);
+        expect(getPath(['lol'])).to.throw;
+        expect(fs.writeFile.callCount).to.eql(3);
         fs.writeFile.restore();
         done();
       });

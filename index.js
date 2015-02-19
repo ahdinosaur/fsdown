@@ -81,32 +81,59 @@ function fsDown(encoding) {
     return setIn(this._writing, path, state);
   }
 
-  FsDOWN.prototype._dataToBatchOp = function (data) {
-    console.log("_dataToBatchOp", data);
-
-    return Object.keys(data).map(function(key) {
-      var value = data[key];
-
-      if (/^\$/.test(key)) {
-        key = key.slice(1);
-      } else {
-        try {
-          key = new Buffer(encoding.decode(key));
-        } catch (e) {
-          throw new Error('Error parsing key ' +
-            encoding.encode(key) + ' as a buffer');
-        }
-      }
-      if (typeof(value) != 'string') {
+  FsDOWN.prototype._encodeValue = function (value) {
+    if (typeof key === 'string') {
+      key = key;
+    } else {
       try {
-        value = new Buffer(value);
+        value = encoding.encode(value);
       } catch (e) {
-        throw new Error('Error parsing value ' +
-           encoding.encode(value) + ' as a buffer');
-        }
+        throw new Error('Error encoding value ' +
+            encoding.encode(value));
       }
-      return {type: 'put', key: key, value: value};
-    });
+      return value;
+    }
+  }
+
+  FsDOWN.prototype._encodeKey = function (key) {
+    if (typeof key === 'string') {
+      key = key;
+    } else {
+      try {
+        key = encoding.encode(key);
+      } catch (e) {
+        throw new Error('Error encoding key ' +
+          encoding.encode(key));
+      }
+    }
+    return key;
+  }
+
+  FsDOWN.prototype._decodeValue = function (value) {
+    try {
+      value = encoding.decode(value);
+    } catch (e) {
+      throw new Error('Error decoding value ' +
+          encoding.encode(value));
+    }
+    return value;
+  }
+
+  FsDOWN.prototype._decodeKey = function (key) {
+    try {
+      key = encoding.decode(key);
+    } catch (e) {
+      throw new Error('Error decoding key ' +
+        encoding.encode(key));
+    }
+    return key;
+  }
+
+  FsDOWN.prototype._dataToPut = function (key, value) {
+    console.log("_dataToPut", key, value);
+    key = this._encodeKey(key);
+    value = this._encodeValue(value);
+    return {type: 'put', key: key, value: value};
   };
 
   FsDOWN.prototype._open = function(options, cb) {
@@ -137,22 +164,15 @@ function fsDown(encoding) {
 
       var key = this._pathToKey(path);
 
-      fs.readFile(entry.fullPath, 'utf8', function (err, data) {
+      fs.readFile(entry.fullPath, 'utf8', function (err, value) {
         if (err) { return cb(err); }
 
-        console.log("data", key, data);
+        console.log("key", key, "value", value);
 
-        try {
-          data = encoding.decode(data);
-        } catch (e) {
-          return cb(new Error('Error decoding file in ' +
-            entry.path + ": " + e.message
-          ));
-        }
-        
-        // convert to batch op
-        //var op = this._dataToBatchOp(data);
-        var op = {type: 'put', key: key, value: data};
+        // decode value to test
+        this._decodeValue(value);
+
+        var op = {type: 'put', key: key, value: value};
 
         return cb(null, op);
       }.bind(this));
@@ -208,18 +228,25 @@ function fsDown(encoding) {
     }.bind(this));
   };
 
+  FsDOWN.prototype._get = function(key, options, cb) {
+    MemDOWN.prototype._get.call(this, key, options, function (err, value) {
+      if (err) { return cb(err); }
+      // decode value
+      value = encoding.decode(value);
+      cb(null, value);
+    });
+  };
+
   FsDOWN.prototype._put = function(key, value, options, cb) {
-    // check that level keys are can be filenames
-    //if (level.map(function ) {
-    //})
-    MemDOWN.prototype._put.call(this, key, value, options, noop);
+    // TODO check that level keys can be filenames
+    // encode value
+    var put = this._dataToPut(key, value);
+    MemDOWN.prototype._put.call(this, put.key, put.value, options, noop);
     if (this._loaded) this._write(key, cb);
   };
 
   FsDOWN.prototype._del = function(key, options, cb) {
-    // check that level keys are can be filenames
-    //if (level.map(function ) {
-    //})
+    // TODO check that level keys are can be filenames
     MemDOWN.prototype._del.call(this, key, options, noop);
     this._write(key, cb);
   };
